@@ -3,6 +3,10 @@ import type { ViteDevServer } from "vite";
 import { createServer as createViteServer } from "vite";
 import config from "./zosite.json";
 import { Hono } from "hono";
+import api from "./src/lib/api/routes";
+import { runMigrations as runDbMigrations } from "./src/lib/db";
+import { loadCountryConfigs, seedWorld } from "./src/lib/countries/seed";
+import { startTickEngine } from "./src/lib/game/tick";
 
 // AI agents: read README.md for navigation and contribution guidance.
 type Mode = "development" | "production";
@@ -15,6 +19,15 @@ const mode: Mode =
  * Add any API routes here.
  */
 app.get("/api/hello-zo", (c) => c.json({ msg: "Hello from Zo" }));
+
+// Mount PolitySim API before the Vite middleware
+app.route("/api", api);
+
+// Initialize database and seed on boot (idempotent)
+runDbMigrations();
+const countries = loadCountryConfigs();
+seedWorld(countries);
+startTickEngine();
 
 if (mode === "production") {
   configureProduction(app);
