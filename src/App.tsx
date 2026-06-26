@@ -10,14 +10,18 @@ import Dashboard from "./pages/Dashboard";
 import CountryView from "./pages/CountryView";
 import PoliticianNew from "./pages/PoliticianNew";
 import PoliticianDetail from "./pages/PoliticianDetail";
+import Politicians from "./pages/Politicians";
 import ElectionsPage from "./pages/ElectionsPage";
 import LegislationPage from "./pages/LegislationPage";
+import World from "./pages/World";
+import Markets from "./pages/Markets";
+import Wiki from "./pages/Wiki";
 import Run from "./pages/Run";
+import Profile from "./pages/Profile";
+import ActionsHub from "./pages/ActionsHub";
 import NotFound from "./pages/NotFound";
 import CabinetOffice from "./pages/CabinetOffice";
 import CabinetOfficeDetail from "./pages/CabinetOfficeDetail";
-import Profile from "./pages/Profile";
-import ActionsHub from "./pages/ActionsHub";
 
 export default function App() {
   return (
@@ -30,16 +34,20 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
-            <Route path="/countries/:id" element={<RequireAuth><CountryView /></RequireAuth>} />
+            <Route path="/politicians" element={<Politicians />} />
             <Route path="/politicians/new" element={<RequireAuth><PoliticianNew /></RequireAuth>} />
-            <Route path="/politicians/:id" element={<RequireAuth><PoliticianDetail /></RequireAuth>} />
-            <Route path="/elections" element={<RequireAuth><ElectionsPage /></RequireAuth>} />
+            <Route path="/politicians/:id" element={<PoliticianDetail />} />
+            <Route path="/countries/:id" element={<CountryView />} />
+            <Route path="/elections" element={<ElectionsPage />} />
             <Route path="/legislation" element={<LegislationPage />} />
-            <Route path="/run" element={<Run />} />
-            <Route path="/cabinet" element={<CabinetOffice />} />
-            <Route path="/cabinet/:id" element={<CabinetOfficeDetail />} />
+            <Route path="/world" element={<World />} />
+            <Route path="/markets" element={<Markets />} />
+            <Route path="/wiki" element={<Wiki />} />
+            <Route path="/run" element={<RequireAuth><Run /></RequireAuth>} />
             <Route path="/profile/:id" element={<RequireAuth><Profile /></RequireAuth>} />
             <Route path="/actions/:id" element={<RequireAuth><ActionsHub /></RequireAuth>} />
+            <Route path="/cabinet" element={<CabinetOffice />} />
+            <Route path="/cabinet/:id" element={<CabinetOfficeDetail />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

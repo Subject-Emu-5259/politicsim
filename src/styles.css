@@ -4,6 +4,27 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* WIRE ticker animation — scrolling event feed */
+@keyframes wire-scroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+.wire-track {
+  display: inline-block;
+  white-space: nowrap;
+  animation: wire-scroll 60s linear infinite;
+}
+.wire-track:hover {
+  animation-play-state: paused;
+}
+
+/* Footer game-state bar */
+.game-footer-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 40;
+}
+
 :root {
   color-scheme: light dark;
   font-synthesis: none;
