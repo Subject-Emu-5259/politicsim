@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/useApi";
+import { fetchApi } from "@/lib/fetchClient";
 
 interface PoliticianDetailData {
   politician: {
@@ -43,10 +44,8 @@ export default function PoliticianDetail() {
   async function act(endpoint: string, payload: Record<string, unknown>) {
     setActing(true);
     try {
-      const res = await fetch(`/api/politicians/${id}/${endpoint}`, {
+      const res = await fetchApi(`/api/politicians/${id}/${endpoint}`, {
         method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));

@@ -1,10 +1,11 @@
-// Auth helpers: bcrypt password hashing + opaque session tokens persisted in DB.
-// Session cookies are HttpOnly, SameSite=Lax, and live 30 days.
+// Auth helpers: bcrypt password hashing + opaque session tokens.
+// Auth token is sent via Authorization: Bearer header (works in iframe contexts
+// where third-party cookies are blocked). Cookie is kept as a fallback.
 
 import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
 import type { Context } from "hono";
-import { db, prep, jsonGet } from "../db";
+import { db, prep } from "../db";
 import type { AuthSession, User, UserRole } from "../game/types";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -50,14 +51,20 @@ export function getUserFromSession(token: string): AuthSession | null {
 }
 
 export function setSessionCookie(c: Context, token: string, expiresAt: number) {
+  const isHttps = c.req.url.startsWith("https://") || c.req.header("x-forwarded-proto") === "https";
+  const secure = isHttps ? "; Secure" : "";
+  const sameSite = isHttps ? "None" : "Lax";
   c.header(
     "Set-Cookie",
-    `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Expires=${new Date(expiresAt).toUTCString()}`,
+    `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=${sameSite}${secure}; Expires=${new Date(expiresAt).toUTCString()}`,
   );
 }
 
 export function clearSessionCookie(c: Context) {
-  c.header("Set-Cookie", `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+  const isHttps = c.req.url.startsWith("https://") || c.req.header("x-forwarded-proto") === "https";
+  const secure = isHttps ? "; Secure" : "";
+  const sameSite = isHttps ? "None" : "Lax";
+  c.header("Set-Cookie", `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=${sameSite}${secure}; Max-Age=0`);
 }
 
 export function readSessionCookie(c: Context): string | null {
@@ -70,8 +77,17 @@ export function readSessionCookie(c: Context): string | null {
   return null;
 }
 
+/** Read auth token from Authorization: Bearer header, falling back to cookie. */
+export function extractToken(c: Context): string | null {
+  const authHeader = c.req.header("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.slice(7);
+  }
+  return readSessionCookie(c);
+}
+
 export function requireAuth(c: Context): AuthSession | { error: Response } {
-  const token = readSessionCookie(c);
+  const token = extractToken(c);
   if (!token) {
     return { error: c.json({ error: "Authentication required" }, 401) };
   }

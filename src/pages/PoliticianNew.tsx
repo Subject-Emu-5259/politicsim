@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useApi } from "@/hooks/useApi";
+import { fetchApi } from "@/lib/fetchClient";
 
 const IDEOLOGIES = ["far-left", "left", "center-left", "center", "center-right", "right", "far-right"] as const;
 
@@ -35,10 +36,8 @@ export default function PoliticianNew() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await fetch("/api/politicians", {
+      const res = await fetchApi("/api/politicians", {
         method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ countryId, name, ideology, partyId: partyId || null, homeRegion }),
       });
       if (!res.ok) {

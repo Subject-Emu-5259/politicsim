@@ -4,6 +4,7 @@
 
 import { db, prep, jsonGet } from "../db";
 import { nanoid } from "nanoid";
+import { seedNpcPoliticians } from "../game/npc";
 import {
   REAL_MS_PER_GAME_WEEK,
   realMsToWeek,
@@ -85,7 +86,64 @@ function tick() {
 }
 
 function advanceWeek(week: number) {
-  // 1. Update elections: any that are "scheduled" and week >= scheduled week move to "campaigning"
+  // 0. NPC Autonomy: Randomly selected NPCs take actions
+  const npcs = prep<[], { id: string; countryId: string; partyId: string | null; statsJson: string }>(
+    "SELECT id, countryId, partyId, statsJson FROM politicians WHERE ownerUserId = 'system-npc'",
+  ).all();
+  for (const npc of npcs) {
+    if (Math.random() < 0.1) { // 10% chance to act per week
+      const stats = jsonGet<Record<string, number>>(npc.statsJson, {});
+      if (stats.stamina < 10) {
+        // Force rest
+        db.run("UPDATE politicians SET statsJson = ? WHERE id = ?", [
+          JSON.stringify({ ...stats, stamina: stats.stamina + 20 }),
+          npc.id,
+        ]);
+        continue;
+      }
+
+      const action = Math.random();
+      if (action < 0.4) {
+        // Fundraise
+        db.run("UPDATE politicians SET statsJson = ? WHERE id = ?", [
+          JSON.stringify({ ...stats, stamina: stats.stamina - 10, fundraising: (stats.fundraising ?? 0) + 5000 }),
+          npc.id,
+        ]);
+      } else if (action < 0.7) {
+        // Rally
+        db.run("UPDATE politicians SET statsJson = ? WHERE id = ?", [
+          JSON.stringify({ ...stats, stamina: stats.stamina - 15, approval: Math.min(100, (stats.approval ?? 50) + 2) }),
+          npc.id,
+        ]);
+      } else {
+        // Propose a bill
+        const topics = ["economy", "healthcare", "education", "environment", "immigration", "defense", "civil-rights", "taxation", "housing", "transportation", "foreign-affairs", "crime"];
+        const topic = topics[Math.floor(Math.random() * topics.length)];
+        const id = nanoid(12);
+        db.run(
+          `INSERT INTO bills (id, countryId, sponsorPoliticianId, title, summary, topic, stage, proposedWeek, coSponsorsJson, votesForJson, votesAgainstJson, abstentionsJson, effectsJson)
+           VALUES (?, ?, ?, ?, ?, ?, 'committee', ?, '[]', '[]', '[]', '[]', '[]')`,
+          [id, npc.countryId, npc.id, `NPC Bill ${id}`, `A proposal regarding ${topic}`, topic, week],
+        );
+      }
+    }
+  }
+
+  // 1. Schedule new elections for offices whose terms have expired
+  const expiredOffices = prep<[number], { id: string; countryId: string; nextElectionWeek: number; type: string; name: string }>(
+    "SELECT id, countryId, nextElectionWeek, type, name FROM offices WHERE nextElectionWeek <= ?",
+  ).all(week);
+  for (const o of expiredOffices) {
+    const electionId = nanoid(12);
+    db.run(
+      `INSERT INTO elections (id, officeId, countryId, week, stage, candidatesJson, resultsJson)
+       VALUES (?, ?, ?, ?, 'scheduled', '[]', '[]')`,
+      [electionId, o.id, o.countryId, week],
+    );
+    logEvent(o.countryId, week, "election-scheduled", `Election for ${o.name} is now scheduled.`, { electionId });
+  }
+
+  // 2. Update existing elections: any that are "scheduled" and week >= scheduled week move to "campaigning"
   const elections = prep<[number], { id: string; week: number; stage: string }>(
     "SELECT id, week, stage FROM elections WHERE week = ?",
   ).all(week);
@@ -96,7 +154,39 @@ function advanceWeek(week: number) {
     }
   }
 
-  // 2. Any elections in "voting" stage at this week get resolved
+  // 3. NPC Candidacy: NPCs decide whether to run for open campaigns
+  const campaigning = prep<[], { id: string; officeId: string; countryId: string; candidatesJson: string }>(
+    "SELECT id, officeId, countryId, candidatesJson FROM elections WHERE stage = 'campaigning'",
+  ).all();
+  for (const e of campaigning) {
+    const cands = jsonGet<string[]>(e.candidatesJson, []);
+    const eligibleNpcs = prep<[string], { id: string; statsJson: string }>(
+      "SELECT id, statsJson FROM politicians WHERE countryId = ? AND ownerUserId = 'system-npc'",
+    ).all(e.countryId);
+    for (const npc of eligibleNpcs) {
+      const stats = jsonGet<{ charisma: number }>(npc.statsJson, { charisma: 50 });
+      if (Math.random() < (stats.charisma ?? 50) / 200) { // Higher charisma = more likely to run
+        if (!cands.includes(npc.id)) {
+          cands.push(npc.id);
+          db.run("UPDATE elections SET candidatesJson = ? WHERE id = ?", [JSON.stringify(cands), e.id]);
+          logEvent(e.countryId, week, "election-result", `NPC ${npc.id} has declared candidacy for office ${e.officeId}`, { electionId: e.id });
+        }
+      }
+    }
+  }
+
+  // 4. Transition campaigns to voting: a campaign lasts 4 weeks
+  const activeCampaigns = prep<[], { id: string; week: number }>(
+    "SELECT id, week FROM elections WHERE stage = 'campaigning'",
+  ).all();
+  for (const e of activeCampaigns) {
+    if (week - e.week >= 4) {
+      db.run("UPDATE elections SET stage = 'voting' WHERE id = ?", [e.id]);
+      logEvent(null, week, "election-result", `Election ${e.id} has moved to the voting phase.`, { electionId: e.id });
+    }
+  }
+
+  // 5. Any elections in "voting" stage at this week get resolved
   const voting = prep<[], { id: string; officeId: string; candidatesJson: string }>(
     "SELECT id, officeId, candidatesJson FROM elections WHERE stage = 'voting'",
   ).all();
@@ -109,7 +199,7 @@ function advanceWeek(week: number) {
     resolveElection(e.id, e.officeId, cands, week);
   }
 
-  // 3. Bills in committee → floor-vote after 2 weeks
+  // 6. Bills in committee → floor-vote after 2 weeks
   const committeeBills = prep<[], { id: string; countryId: string; proposedWeek: number }>(
     "SELECT id, countryId, proposedWeek FROM bills WHERE stage = 'committee'",
   ).all();
@@ -119,7 +209,7 @@ function advanceWeek(week: number) {
     }
   }
 
-  // 4. Bills in floor-vote get resolved this week (random outcome weighted by sponsor approval)
+  // 7. Bills in floor-vote get resolved this week (random outcome weighted by sponsor approval)
   const floorBills = prep<[], { id: string; countryId: string; sponsorPoliticianId: string; topic: string }>(
     "SELECT id, countryId, sponsorPoliticianId, topic FROM bills WHERE stage = 'floor-vote'",
   ).all();
@@ -127,7 +217,7 @@ function advanceWeek(week: number) {
     const sponsor = prep<[string], { statsJson: string }>(
       "SELECT statsJson FROM politicians WHERE id = ?",
     ).get(b.sponsorPoliticianId);
-    const stats = sponsor ? jsonGet<{ approval?: number; competence?: number }>(sponsor.statsJson, {}) : {};
+    const stats = sponsor ? jsonGet<{ approval?: number; competence?: number; fundraising?: number }>(sponsor.statsJson, {}) : {};
     const passProb = ((stats.approval ?? 50) + (stats.competence ?? 50)) / 200; // 0-1
     const passes = Math.random() < passProb;
     db.run(
@@ -143,7 +233,7 @@ function advanceWeek(week: number) {
     );
   }
 
-  // 5. Apply macro effects: each signed bill nudges macro stats by its effects
+  // 8. Apply macro effects: each signed bill nudges macro stats by its effects
   const signedBills = prep<[], { id: string; countryId: string; effectsJson: string }>(
     "SELECT id, countryId, effectsJson FROM bills WHERE stage = 'signed'",
   ).all();
@@ -154,7 +244,7 @@ function advanceWeek(week: number) {
     }
   }
 
-  // 6. Drift approval baselines slightly toward 50 (mean reversion)
+  // 9. Drift approval baselines slightly toward 50 (mean reversion)
   const countries = prep<[], { id: string; approvalBaseline: number }>(
     "SELECT id, approvalBaseline FROM countries",
   ).all();

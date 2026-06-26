@@ -10,60 +10,53 @@ import { useAuth } from "@/hooks/useAuth";
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { refresh } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const next = (location.state as { from?: string } | null)?.from ?? "/dashboard";
+  const next = (location.state as { from?: string })?.from ?? "/dashboard";
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.error ?? "Login failed");
+      const result = await login(email, password);
+      if (!result.ok) {
+        toast.error(result.error ?? "Login failed");
         return;
       }
-      await refresh();
       toast.success("Signed in");
-      navigate(next);
+      navigate(next, { replace: true });
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md items-center px-6">
-      <Card className="w-full">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Sign in to PolitySim</CardTitle>
-          <CardDescription>Welcome back. The world kept ticking.</CardDescription>
+          <CardTitle className="text-2xl">Sign in</CardTitle>
+          <CardDescription>Welcome back to PolitySim.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={onSubmit}>
+          <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input id="password" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? "Signing in…" : "Sign in"}
             </Button>
-            <p className="text-center text-sm text-muted-foreground">
-              No account? <Link to="/register" className="underline">Register</Link>
-            </p>
           </form>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            New here? <Link to="/register" className="text-primary font-medium hover:underline">Create an account</Link>
+          </p>
         </CardContent>
       </Card>
     </div>

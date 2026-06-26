@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { fetchApi } from "@/lib/fetchClient";
 
 interface FetcherOptions<T> {
   url: string;
@@ -20,10 +21,8 @@ export function useApi<T = unknown>(opts: FetcherOptions<T>) {
     inflight.current = true;
     setLoading(true);
     try {
-      const res = await fetch(url, {
+      const res = await fetchApi(url, {
         method,
-        credentials: "same-origin",
-        headers: body ? { "Content-Type": "application/json" } : undefined,
         body: body ? JSON.stringify(body) : undefined,
       });
       const json = await res.json().catch(() => ({}));

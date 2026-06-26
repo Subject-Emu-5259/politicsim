@@ -12,28 +12,30 @@ import PoliticianNew from "./pages/PoliticianNew";
 import PoliticianDetail from "./pages/PoliticianDetail";
 import ElectionsPage from "./pages/ElectionsPage";
 import LegislationPage from "./pages/LegislationPage";
+import Run from "./pages/Run";
 import NotFound from "./pages/NotFound";
-
-const Protected = ({ children }: { children: React.ReactNode }) => (
-  <RequireAuth>{children}</RequireAuth>
-);
+import CabinetOffice from "./pages/CabinetOffice";
+import CabinetOfficeDetail from "./pages/CabinetOfficeDetail";
 
 export default function App() {
   return (
     <ThemeProvider>
-      <Toaster position="top-right" richColors closeButton />
       <AuthProvider>
+        <Toaster position="top-right" richColors closeButton />
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
-            <Route path="/countries/:id" element={<Protected><CountryView /></Protected>} />
-            <Route path="/politicians/new" element={<Protected><PoliticianNew /></Protected>} />
-            <Route path="/politicians/:id" element={<Protected><PoliticianDetail /></Protected>} />
-            <Route path="/elections" element={<Protected><ElectionsPage /></Protected>} />
-            <Route path="/legislation" element={<Protected><LegislationPage /></Protected>} />
+            <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+            <Route path="/countries/:id" element={<RequireAuth><CountryView /></RequireAuth>} />
+            <Route path="/politicians/new" element={<RequireAuth><PoliticianNew /></RequireAuth>} />
+            <Route path="/politicians/:id" element={<RequireAuth><PoliticianDetail /></RequireAuth>} />
+            <Route path="/elections" element={<RequireAuth><ElectionsPage /></RequireAuth>} />
+            <Route path="/legislation" element={<LegislationPage />} />
+            <Route path="/run" element={<Run />} />
+            <Route path="/cabinet" element={<CabinetOffice />} />
+            <Route path="/cabinet/:id" element={<CabinetOfficeDetail />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -6,7 +6,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { SQLQueryBindings } from "bun:sqlite";
 
-const DB_PATH = process.env.POLITYSIM_DB ?? "data/politicsim.sqlite";
+const DB_PATH = process.env.POLITYSIM_DB ?? "/home/workspace/politicsim/data/politicsim.sqlite";
 
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
@@ -15,7 +15,7 @@ db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA foreign_keys = ON;");
 db.exec("PRAGMA synchronous = NORMAL;");
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const MIGRATIONS: { version: number; sql: string }[] = [
   {
@@ -181,6 +181,18 @@ const MIGRATIONS: { version: number; sql: string }[] = [
       );
       CREATE INDEX IF NOT EXISTS idx_events_week ON events(week);
       CREATE INDEX IF NOT EXISTS idx_events_country ON events(countryId, week);
+    `,
+  },
+  {
+    version: 2,
+    sql: `
+      CREATE TABLE IF NOT EXISTS cabinet_actions (
+        politicianId TEXT PRIMARY KEY,
+        remaining INTEGER NOT NULL DEFAULT 4,
+        lastResetAt INTEGER NOT NULL,
+        FOREIGN KEY (politicianId) REFERENCES politicians(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_cabinet_reset ON cabinet_actions(lastResetAt);
     `,
   },
 ];

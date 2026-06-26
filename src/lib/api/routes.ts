@@ -16,18 +16,84 @@ import {
   getUserByEmail,
   getUserById,
   createUser,
+  extractToken,
 } from "../auth";
 import type {
   Politician, Bill, Election, Party, DemographicGroup, Country, GameEvent,
 } from "../game/types";
 import { realMsToWeek, weekToGameDate } from "../game/types";
 import { subscribe } from "../metrics/emitter";
+import { emit } from "../metrics/emitter";
+import { loadCountryConfigs, seedWorld, seedNpcs } from "../countries/seed";
+
+function logEvent(countryId: string | null, kind: string, message: string, payload: Record<string, unknown> = {}) {
+  const id = nanoid(14);
+  const now = Date.now();
+  const week = realMsToWeek(now);
+  db.run(
+    "INSERT INTO events (id, countryId, week, kind, message, payloadJson, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [id, countryId, week, kind, message, JSON.stringify(payload), now],
+  );
+  emit("event", { id, countryId, week, kind, message, payload });
+}
 
 const api = new Hono();
 
 // ─────────────────────────────────────────────
 // Auth
 // ─────────────────────────────────────────────
+
+api.get("/auth/me", (c) => {
+  const token = extractToken(c);
+  if (!token) return c.json({ error: "Unauthorized" }, 401);
+  const session = getUserFromSession(token);
+  if (!session) return c.json({ error: "Session expired" }, 401);
+  const user = getUserById(session.userId);
+  if (!user) return c.json({ error: "User not found" }, 404);
+  return c.json({ user });
+});
+
+api.post("/auth/register-with-politician", async (c) => {
+  const body = await c.req.json<{
+    email?: string; password?: string; displayName?: string;
+    politicianName?: string; countryId?: string; ideology?: string;
+    partyId?: string | null; homeRegion?: string;
+  }>();
+  const email = (body.email ?? "").trim().toLowerCase();
+  const password = body.password ?? "";
+  const displayName = (body.displayName ?? "").trim();
+  const polName = (body.politicianName ?? "").trim();
+  if (!email || !password || !displayName || !polName || !body.countryId)
+    return c.json({ error: "Missing fields" }, 400);
+  if (password.length < 8) return c.json({ error: "Password must be ≥8 chars" }, 400);
+  if (getUserByEmail(email)) return c.json({ error: "Email already registered" }, 409);
+
+  const passwordHash = await hashPassword(password);
+  const user = createUser({ email, displayName, passwordHash });
+  const { token, expiresAt } = createSession(user.id);
+  setSessionCookie(c, token, expiresAt);
+
+  // Create the first politician
+  const polId = nanoid(14);
+  const createdAt = realMsToWeek(Date.now());
+  const stats = { charisma: 50, competence: 50, integrity: 50, stamina: 100, approval: 50, fundraising: 0 };
+  const demog = { age: 40, gender: "nonbinary" as const, ethnicity: "Unspecified" };
+  db.run(
+    `INSERT INTO politicians (id, ownerUserId, countryId, name, partyId, ideology, status, officeId, homeRegion, demographicsJson, statsJson, createdAt, portraitUrl)
+     VALUES (?, ?, ?, ?, ?, ?, 'private', NULL, ?, ?, ?, ?, NULL)`,
+    [
+      polId, user.id, body.countryId, polName, body.partyId ?? null,
+      body.ideology ?? "center", body.homeRegion ?? "Unknown",
+      JSON.stringify(demog), JSON.stringify(stats), createdAt,
+    ],
+  );
+  logEvent(body.countryId, "politician-joined", `${polName} entered politics.`);
+  return c.json({
+    user: { id: user.id, email: user.email, displayName: user.displayName },
+    politicianId: polId,
+    token,
+  });
+});
 
 api.post("/auth/register", async (c) => {
   const body = await c.req.json<{ email?: string; password?: string; displayName?: string }>();
@@ -41,7 +107,10 @@ api.post("/auth/register", async (c) => {
   const user = createUser({ email, displayName, passwordHash });
   const { token, expiresAt } = createSession(user.id);
   setSessionCookie(c, token, expiresAt);
-  return c.json({ user: { id: user.id, email: user.email, displayName: user.displayName } });
+  return c.json({
+    user: { id: user.id, email: user.email, displayName: user.displayName },
+    token,
+  });
 });
 
 api.post("/auth/login", async (c) => {
@@ -54,24 +123,17 @@ api.post("/auth/login", async (c) => {
   if (!ok) return c.json({ error: "Invalid credentials" }, 401);
   const { token, expiresAt } = createSession(user.id);
   setSessionCookie(c, token, expiresAt);
-  return c.json({ user: { id: user.id, email: user.email, displayName: user.displayName } });
+  return c.json({
+    user: { id: user.id, email: user.email, displayName: user.displayName },
+    token,
+  });
 });
 
 api.post("/auth/logout", (c) => {
-  const token = readSessionCookie(c);
+  const token = extractToken(c);
   if (token) destroySession(token);
   clearSessionCookie(c);
   return c.json({ ok: true });
-});
-
-api.get("/auth/me", (c) => {
-  const token = readSessionCookie(c);
-  if (!token) return c.json({ user: null });
-  const session = getUserFromSession(token);
-  if (!session) return c.json({ user: null });
-  const user = getUserById(session.userId);
-  if (!user) return c.json({ user: null });
-  return c.json({ user: { id: user.id, email: user.email, displayName: user.displayName, role: user.role } });
 });
 
 // ─────────────────────────────────────────────
@@ -79,17 +141,32 @@ api.get("/auth/me", (c) => {
 // ─────────────────────────────────────────────
 
 api.get("/world", (c) => {
-  const w = prep<[], { currentWeek: number; lastTickAt: number; isPaused: number; tickSpeedMultiplier: number }>(
-    "SELECT currentWeek, lastTickAt, isPaused, tickSpeedMultiplier FROM world WHERE id = 'world'",
-  ).get() ?? { currentWeek: 0, lastTickAt: 0, isPaused: 0, tickSpeedMultiplier: 1 };
-  return c.json({
-    currentWeek: w.currentWeek,
-    gameDate: weekToGameDate(w.currentWeek),
-    isPaused: !!w.isPaused,
-    tickSpeedMultiplier: w.tickSpeedMultiplier,
-    lastTickAt: w.lastTickAt,
-    nextTickInMs: 60 * 60 * 1000 - ((Date.now() - w.lastTickAt) % (60 * 60 * 1000)),
-  });
+  const world = prep<[], any>("SELECT * FROM world WHERE id = 'world'").get();
+  return c.json({ world });
+});
+
+api.post("/world/update", async (c) => {
+  const guard = requireAuth(c);
+  if ("error" in guard) return guard.error;
+  const body = await c.req.json<{ isPaused?: number; tickSpeedMultiplier?: number }>();
+  if (body.isPaused !== undefined) db.run("UPDATE world SET isPaused = ? WHERE id = 'world'", [body.isPaused]);
+  if (body.tickSpeedMultiplier !== undefined) db.run("UPDATE world SET tickSpeedMultiplier = ? WHERE id = 'world'", [body.tickSpeedMultiplier]);
+  return c.json({ success: true });
+});
+
+api.post("/world/reset", async (c) => {
+  const guard = requireAuth(c);
+  if ("error" in guard) return guard.error;
+  db.exec("DELETE FROM politicians; DELETE FROM bills; DELETE FROM elections;");
+  db.run("UPDATE world SET currentWeek = 0, lastTickAt = ? WHERE id = 'world'", [Date.now()]);
+  return c.json({ success: true });
+});
+
+api.post("/world/seed-npcs", async (c) => {
+  const guard = requireAuth(c);
+  if ("error" in guard) return guard.error;
+  seedNpcs();
+  return c.json({ success: true });
 });
 
 // SSE: streams world updates to the browser
@@ -396,6 +473,75 @@ api.post("/elections/:id/declare", async (c) => {
     db.run("UPDATE politicians SET status = 'campaigning' WHERE id = ?", [body.politicianId]);
   }
   return c.json({ ok: true, candidates: cands });
+});
+
+// ─────────────────────────────────────────────
+// Cabinet Office
+// ─────────────────────────────────────────────
+
+api.get("/cabinet/seats", (c) => {
+  const countryId = c.req.query("country");
+  if (!countryId) return c.json({ error: "Country ID required" }, 400);
+  
+  const seats = prep<[string], { id: string; name: string; type: string; holderName: string | null; holderId: string | null }>(
+    "SELECT o.id, o.name, o.type, p.name as holderName, p.id as holderId FROM offices o LEFT JOIN politicians p ON o.id = p.officeId WHERE o.countryId = ? AND o.type = 'cabinet' ORDER BY o.name",
+  ).all(countryId);
+  
+  return c.json({ seats });
+});
+
+api.get("/cabinet/office/:id", (c) => {
+  const id = c.req.param("id");
+  const office = prep<[string], any>(
+    "SELECT * FROM offices WHERE id = ?",
+  ).get(id);
+  if (!office) return c.json({ error: "Office not found" }, 404);
+  
+  return c.json({
+    name: office.name,
+    type: office.type,
+    specialization: "General Administration",
+    budgetUSD: 500_000_000,
+    metrics: [
+      { label: "Public Trust", value: "64%", trend: "up" },
+      { label: "Efficiency", value: "72%", trend: "stable" },
+      { label: "Budget Adherence", value: "91%", trend: "down" },
+    ],
+    actions: [
+      { id: "budget-review", title: "Budget Review", desc: "Audit department spending and reallocate funds.", cost: 1 },
+      { id: "policy-push", title: "Policy Push", desc: "Accelerate a pending bill through the chamber.", cost: 2 },
+      { id: "public-address", title: "Public Address", desc: "Issue a departmental statement to boost approval.", cost: 1 },
+    ],
+  });
+});
+
+api.post("/cabinet/action", async (c) => {
+  const guard = requireAuth(c);
+  if ("error" in guard) return guard.error;
+  
+  const { officeId, actionId } = await c.req.json<{ officeId: string; actionId: string }>();
+  
+  const office = prep<[string, string, string], any>(
+    "SELECT id FROM offices WHERE id = ? AND EXISTS (SELECT 1 FROM politicians WHERE id = ? AND officeId = ?)",
+  ).get(officeId, guard.userId, officeId);
+  
+  if (!office) return c.json({ error: "You do not hold this office" }, 403);
+  
+  const actionCost = 1;
+  const current = prep<[string], { remaining: number }>(
+    "SELECT remaining FROM cabinet_actions WHERE politicianId = ?",
+  ).get(guard.userId);
+  
+  if (!current || current.remaining < actionCost) {
+    return c.json({ error: "Insufficient action points" }, 400);
+  }
+  
+  db.run(
+    "UPDATE cabinet_actions SET remaining = remaining - ? WHERE politicianId = ? AND seatId = ?",
+    [actionCost, guard.userId, officeId]
+  );
+  
+  return c.json({ success: true, message: "Order issued" });
 });
 
 // ─────────────────────────────────────────────
