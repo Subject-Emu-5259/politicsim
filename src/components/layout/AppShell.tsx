@@ -30,11 +30,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <nav className="flex items-center gap-1">
             <NavItem to="/dashboard" icon={<BarChart3 className="h-4 w-4" />}>Dashboard</NavItem>
             <NavItem to="/elections" icon={<Vote className="h-4 w-4" />}>Elections</NavItem>
-            <NavLink to="/legislation" className={({ isActive }) => cn("flex items-center gap-2 text-sm font-medium transition-colors hover:text-foreground", isActive ? "text-foreground" : "text-muted-foreground")}>
-              <FileText className="h-4 w-4" /> Legislation
-            </NavLink>
+            <NavItem to="/legislation" icon={<FileText className="h-4 w-4" />}>Legislation</NavItem>
             <NavLink to="/cabinet" className={({ isActive }) => cn("flex items-center gap-2 text-sm font-medium transition-colors hover:text-foreground", isActive ? "text-foreground" : "text-muted-foreground")}>
-              <Building2 className="h-4 w-4" /> Cabinet Office
+              <Building2 className="h-4 w-4" /> Cabinet
             </NavLink>
             <NavItem to="/politicians/new" icon={<UserPlus className="h-4 w-4" />}>Run</NavItem>
           </nav>

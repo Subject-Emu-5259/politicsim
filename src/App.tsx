@@ -16,6 +16,8 @@ import Run from "./pages/Run";
 import NotFound from "./pages/NotFound";
 import CabinetOffice from "./pages/CabinetOffice";
 import CabinetOfficeDetail from "./pages/CabinetOfficeDetail";
+import Profile from "./pages/Profile";
+import ActionsHub from "./pages/ActionsHub";
 
 export default function App() {
   return (
@@ -36,6 +38,8 @@ export default function App() {
             <Route path="/run" element={<Run />} />
             <Route path="/cabinet" element={<CabinetOffice />} />
             <Route path="/cabinet/:id" element={<CabinetOfficeDetail />} />
+            <Route path="/profile/:id" element={<RequireAuth><Profile /></RequireAuth>} />
+            <Route path="/actions/:id" element={<RequireAuth><ActionsHub /></RequireAuth>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -25,6 +25,18 @@ import { realMsToWeek, weekToGameDate } from "../game/types";
 import { subscribe } from "../metrics/emitter";
 import { emit } from "../metrics/emitter";
 import { loadCountryConfigs, seedWorld, seedNpcs } from "../countries/seed";
+import {
+  logCareer,
+  logAction,
+  checkAchievements,
+  getCareerHistory,
+  getAchievements,
+  getActionLog,
+  getActionCounts,
+  getElectionWins,
+  type AchievementContext,
+  buildAchievementContext,
+} from "../game/career";
 
 function logEvent(countryId: string | null, kind: string, message: string, payload: Record<string, unknown> = {}) {
   const id = nanoid(14);
@@ -357,30 +369,47 @@ api.post("/politicians/:id/:action", async (c) => {
   if (action === "fundraise") {
     if (stats.stamina < 5) return c.json({ error: "Not enough stamina" }, 400);
     const gain = 25000 + Math.round(Math.random() * 50000) + stats.charisma * 500;
+    const statsBefore = { ...stats };
     stats.fundraising += gain;
     stats.stamina = Math.max(0, stats.stamina - 5);
     db.run("UPDATE politicians SET statsJson = ? WHERE id = ?", [JSON.stringify(stats), id]);
-    return c.json({ message: `Raised $${gain.toLocaleString()}`, stats });
+    logAction(id, "fundraise", `Raised $${gain.toLocaleString()}`, statsBefore, stats);
+    logCareer(id, "fundraise", "Fundraiser", `Raised $${gain.toLocaleString()} for the campaign.`, { gain });
+    const achCtx = buildAchievementContext(id);
+    const newAch = checkAchievements(achCtx);
+    return c.json({ message: `Raised $${gain.toLocaleString()}`, stats, newAchievements: newAch });
   }
 
   if (action === "rally") {
     if (stats.stamina < 10) return c.json({ error: "Not enough stamina" }, 400);
     const approvalGain = 1 + Math.round(Math.random() * 4) + Math.round(stats.charisma / 25);
+    const statsBefore = { ...stats };
     stats.approval = Math.min(100, stats.approval + approvalGain);
     stats.stamina = Math.max(0, stats.stamina - 10);
     db.run("UPDATE politicians SET statsJson = ? WHERE id = ?", [JSON.stringify(stats), id]);
-    return c.json({ message: `Approval +${approvalGain}`, stats });
+    logAction(id, "rally", `Approval +${approvalGain}`, statsBefore, stats);
+    logCareer(id, "rally", "Campaign Rally", `Held a rally, approval rose by ${approvalGain} points.`, { approvalGain, region: row.name });
+    const achCtx = buildAchievementContext(id);
+    const newAch = checkAchievements(achCtx);
+    return c.json({ message: `Approval +${approvalGain}`, stats, newAchievements: newAch });
   }
 
   if (action === "rest") {
     const recover = 15 + Math.round(Math.random() * 15);
+    const statsBefore = { ...stats };
     stats.stamina = Math.min(100, stats.stamina + recover);
     db.run("UPDATE politicians SET statsJson = ? WHERE id = ?", [JSON.stringify(stats), id]);
-    return c.json({ message: `Stamina +${recover}`, stats });
+    logAction(id, "rest", `Stamina +${recover}`, statsBefore, stats);
+    logCareer(id, "rest", "Rest Period", `Recovered ${recover} stamina.`, { recover });
+    const achCtx = buildAchievementContext(id);
+    const newAch = checkAchievements(achCtx);
+    return c.json({ message: `Stamina +${recover}`, stats, newAchievements: newAch });
   }
 
   if (action === "retire") {
     db.run("UPDATE politicians SET status = 'retired' WHERE id = ?", [id]);
+    logAction(id, "retire", "Retired from politics", stats, null);
+    logCareer(id, "retire", "Retirement", `${row.name} retired from politics.`, {});
     return c.json({ message: `${row.name} has retired`, status: "retired" });
   }
 
@@ -395,7 +424,11 @@ api.post("/politicians/:id/:action", async (c) => {
        VALUES (?, ?, ?, ?, ?, ?, 'committee', ?, '[]', '[]', '[]', '[]', '[]', NULL)`,
       [billId, row.countryId, id, title, summary, topic, now],
     );
-    return c.json({ message: `${title} introduced to committee`, bill: { id: billId, title } });
+    logAction(id, "propose-bill", `Introduced: ${title}`, stats, stats);
+    logCareer(id, "propose-bill", "Bill Introduced", `"${title}" entered committee. Topic: ${topic}.`, { billId, title, topic });
+    const achCtx = buildAchievementContext(id);
+    const newAch = checkAchievements(achCtx);
+    return c.json({ message: `${title} introduced to committee`, bill: { id: billId, title }, newAchievements: newAch });
   }
 
   if (action === "vote-bill") {
@@ -586,6 +619,141 @@ api.post("/bills", async (c) => {
     [id, body.countryId, body.sponsorPoliticianId, body.title, body.summary, body.topic, proposedWeek, JSON.stringify(body.effects ?? [])],
   );
   return c.json({ bill: { id, title: body.title, sponsorPoliticianId: body.sponsorPoliticianId } });
+});
+
+// ─────────────────────────────────────────────
+// Profile (bio, stats, career history, political standing, achievements)
+// ─────────────────────────────────────────────
+
+api.get("/profile/:politicianId", (c) => {
+  const id = c.req.param("politicianId");
+  const pol = prep<[string], any>(
+    "SELECT id, ownerUserId, countryId, name, partyId, ideology, status, officeId, homeRegion, demographicsJson, statsJson, createdAt, portraitUrl FROM politicians WHERE id = ?",
+  ).get(id);
+  if (!pol) return c.json({ error: "Politician not found" }, 404);
+
+  const demographics = JSON.parse(pol.demographicsJson);
+  const stats = JSON.parse(pol.statsJson);
+
+  // Party info
+  const party = pol.partyId
+    ? prep<[string], any>("SELECT id, name, shortName, color, ideology FROM parties WHERE id = ?").get(pol.partyId)
+    : null;
+
+  // Office info
+  const office = pol.officeId
+    ? prep<[string], any>("SELECT id, name, type, region, chamber FROM offices WHERE id = ?").get(pol.officeId)
+    : null;
+
+  // Country info
+  const country = prep<[string], any>("SELECT id, name, code FROM countries WHERE id = ?").get(pol.countryId);
+
+  // Career history
+  const careerHistory = prep<[string], any>(
+    "SELECT id, politicianId, kind, title, description, metadataJson, week, createdAt FROM career_history WHERE politicianId = ? ORDER BY createdAt DESC LIMIT 100",
+  ).all(id).map((r: any) => ({
+    ...r,
+    metadata: jsonGet(r.metadataJson, {}),
+  }));
+
+  // Achievements
+  const achievements = prep<[string], any>(
+    "SELECT id, politicianId, kind, title, description, unlockedAt FROM achievements WHERE politicianId = ? ORDER BY unlockedAt DESC",
+  ).all(id);
+
+  // Bills sponsored
+  const billsSponsored = prep<[string], any>(
+    "SELECT id, title, summary, topic, stage, proposedWeek, signedWeek FROM bills WHERE sponsorPoliticianId = ? ORDER BY proposedWeek DESC",
+  ).all(id);
+
+  // Elections participated in
+  const elections = db.query(
+    "SELECT e.id, e.officeId, e.week, e.stage, e.winnerId, o.name as officeName FROM elections e JOIN offices o ON o.id = e.officeId WHERE EXISTS (SELECT 1 FROM json_each(e.candidatesJson) WHERE json_each.value = ?)",
+  ).all(id) as any[];
+
+  // Action log (recent)
+  const actionLog = prep<[string], any>(
+    "SELECT id, politicianId, action, result, statsBeforeJson, statsAfterJson, week, createdAt FROM action_log WHERE politicianId = ? ORDER BY createdAt DESC LIMIT 50",
+  ).all(id).map((r: any) => ({
+    ...r,
+    statsBefore: jsonGet(r.statsBeforeJson, {}),
+    statsAfter: jsonGet(r.statsAfterJson, {}),
+  }));
+
+  // Political standing summary
+  const influenceScore = Math.round(
+    (stats.approval * 0.3) +
+    (stats.charisma * 0.15) +
+    (stats.competence * 0.15) +
+    (stats.integrity * 0.1) +
+    (stats.fundraising / 100000 * 0.15) +
+    (achievements.length * 5 * 0.15)
+  );
+
+  const standing = {
+    influenceScore: Math.min(100, influenceScore),
+    officeName: office?.name ?? "No office held",
+    status: pol.status,
+    approval: stats.approval,
+    warChest: stats.fundraising,
+    billsSponsoredCount: billsSponsored.length,
+    billsPassedCount: billsSponsored.filter((b: any) => b.stage === "signed").length,
+    electionsWonCount: elections.filter((e: any) => e.winnerId === id).length,
+    achievementsCount: achievements.length,
+  };
+
+  return c.json({
+    politician: {
+      id: pol.id,
+      name: pol.name,
+      ideology: pol.ideology,
+      status: pol.status,
+      homeRegion: pol.homeRegion,
+      portraitUrl: pol.portraitUrl,
+      createdAt: pol.createdAt,
+    },
+    bio: {
+      age: demographics.age,
+      gender: demographics.gender,
+      ethnicity: demographics.ethnicity,
+      party: party ? { name: party.name, shortName: party.shortName, color: party.color, ideology: party.ideology } : null,
+      country: country ? { name: country.name, code: country.code } : null,
+      homeRegion: pol.homeRegion,
+    },
+    stats,
+    office,
+    standing,
+    careerHistory,
+    achievements,
+    billsSponsored,
+    elections,
+    actionLog,
+  });
+});
+
+// ─────────────────────────────────────────────
+// Actions (action log for a politician)
+// ─────────────────────────────────────────────
+
+api.get("/actions/:politicianId", (c) => {
+  const id = c.req.param("politicianId");
+  const pol = prep<[string], { ownerUserId: string }>(
+    "SELECT ownerUserId FROM politicians WHERE id = ?",
+  ).get(id);
+  if (!pol) return c.json({ error: "Politician not found" }, 404);
+
+  const actionLog = prep<[string], any>(
+    "SELECT id, politicianId, action, result, statsBeforeJson, statsAfterJson, week, createdAt FROM action_log WHERE politicianId = ? ORDER BY createdAt DESC LIMIT 100",
+  ).all(id).map((r: any) => ({
+    ...r,
+    statsBefore: jsonGet(r.statsBeforeJson, {}),
+    statsAfter: jsonGet(r.statsAfterJson, {}),
+  }));
+
+  // Action counts
+  const counts = getActionCounts(id);
+
+  return c.json({ actions: actionLog, counts });
 });
 
 // ─────────────────────────────────────────────

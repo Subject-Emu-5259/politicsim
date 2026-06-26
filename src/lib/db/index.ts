@@ -15,7 +15,7 @@ db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA foreign_keys = ON;");
 db.exec("PRAGMA synchronous = NORMAL;");
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const MIGRATIONS: { version: number; sql: string }[] = [
   {
@@ -193,6 +193,47 @@ const MIGRATIONS: { version: number; sql: string }[] = [
         FOREIGN KEY (politicianId) REFERENCES politicians(id) ON DELETE CASCADE
       );
       CREATE INDEX IF NOT EXISTS idx_cabinet_reset ON cabinet_actions(lastResetAt);
+    `,
+  },
+  {
+    version: 3,
+    sql: `
+      CREATE TABLE IF NOT EXISTS career_history (
+        id TEXT PRIMARY KEY,
+        politicianId TEXT NOT NULL,
+        week INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        metadataJson TEXT NOT NULL DEFAULT '{}',
+        createdAt INTEGER NOT NULL,
+        FOREIGN KEY (politicianId) REFERENCES politicians(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_career_pol ON career_history(politicianId, week);
+
+      CREATE TABLE IF NOT EXISTS achievements (
+        id TEXT PRIMARY KEY,
+        politicianId TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        unlockedAt INTEGER NOT NULL,
+        FOREIGN KEY (politicianId) REFERENCES politicians(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_ach_pol ON achievements(politicianId);
+
+      CREATE TABLE IF NOT EXISTS action_log (
+        id TEXT PRIMARY KEY,
+        politicianId TEXT NOT NULL,
+        action TEXT NOT NULL,
+        result TEXT NOT NULL,
+        week INTEGER NOT NULL,
+        statsBeforeJson TEXT,
+        statsAfterJson TEXT,
+        createdAt INTEGER NOT NULL,
+        FOREIGN KEY (politicianId) REFERENCES politicians(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_actionlog_pol ON action_log(politicianId, createdAt);
     `,
   },
 ];
