@@ -87,7 +87,14 @@ function tick() {
 }
 
 function advanceWeek(week: number) {
-  // 0. NPC Autonomy: Randomly selected NPCs take actions
+  // 0a. Snapshot FX rates for this week before anything else reads them.
+  // Per-week snapshot avoids the AHD foreign-currency drift bug.
+  recordWeeklyRates(week);
+
+  // 0b. Auto-schedule special elections for retired/defeated office-holders.
+  cleanupOrphanOffices(week);
+
+  // 0c. NPC Autonomy: Randomly selected NPCs take actions
   const npcs = prep<[], { id: string; countryId: string; partyId: string | null; statsJson: string }>(
     "SELECT id, countryId, partyId, statsJson FROM politicians WHERE ownerUserId = 'system-npc'",
   ).all();
@@ -188,16 +195,72 @@ function advanceWeek(week: number) {
   }
 
   // 5. Any elections in "voting" stage at this week get resolved
-  const voting = prep<[], { id: string; officeId: string; candidatesJson: string }>(
-    "SELECT id, officeId, candidatesJson FROM elections WHERE stage = 'voting'",
+  const voting = prep<[], { id: string; officeId: string; candidatesJson: string; week: number }>(
+    "SELECT id, officeId, candidatesJson, week FROM elections WHERE stage = 'voting'",
   ).all();
   for (const e of voting) {
     const cands = jsonGet<string[]>(e.candidatesJson, []);
     if (cands.length === 0) {
-      // No candidates: stage stays voting; NPC will be seeded later
-      continue;
+      // No candidates yet: inject the highest-approval NPC as a last-resort candidate so the
+      // seat is never permanently vacant. Ties broken by charisma. If no NPC exists either,
+      // leave it in voting and re-try next week.
+      const npc = prep<[string], { id: string; statsJson: string }>(
+        "SELECT id, statsJson FROM politicians WHERE countryId = (SELECT countryId FROM offices WHERE id = ?) AND ownerUserId = 'system-npc' ORDER BY json_extract(statsJson, '$.approval') DESC, json_extract(statsJson, '$.charisma') DESC LIMIT 1",
+      ).get(e.officeId);
+      if (!npc) continue;
+      cands.push(npc.id);
+      db.run("UPDATE elections SET candidatesJson = ? WHERE id = ?", [JSON.stringify(cands), e.id]);
     }
-    resolveElection(e.id, e.officeId, cands, week);
+    resolveElection(e.id, e.officeId, cands, e.week);
+  }
+
+  // 5b. Sprint 3: certify elections that finished voting last week.
+  // Schedule: scheduled (e.week) → campaigning (4w) → voting (1w) → certifying (1w) → certified
+  // resolveElection() runs when the election reaches the voting stage; we then wait
+  // one real week of "certifying" before flipping to "certified" and resetting the
+  // office's term clock.
+  const certifying = db
+    .query<{ id: string; officeId: string; resultsJson: string; week: number }, []>(
+      "SELECT id, officeId, resultsJson, week FROM elections WHERE stage = 'certifying'",
+    )
+    .all();
+  for (const e of certifying) {
+    // Only certify once at least 1 week has elapsed since the scheduled week + 5 (campaign+voting)
+    if (week - e.week < 5) continue;
+    const results = jsonGet<{ politicianId: string; voteShare: number }[]>(e.resultsJson, []);
+    if (results.length === 0) continue;
+    const winner = results.reduce((a, b) => (a.voteShare > b.voteShare ? a : b));
+    const office = db
+      .query<{ termLengthWeeks: number }, [string]>("SELECT termLengthWeeks FROM offices WHERE id = ?")
+      .get(e.officeId);
+    if (!office) continue;
+    db.run("UPDATE elections SET stage = 'certified' WHERE id = ?", [e.id]);
+    db.run(
+      "UPDATE politicians SET status = 'elected', officeId = ? WHERE id = ?",
+      [e.officeId, winner.politicianId],
+    );
+    db.run(
+      "UPDATE offices SET nextElectionWeek = ? WHERE id = ?",
+      [week + office.termLengthWeeks, e.officeId],
+    );
+    const careerId = nanoid(12);
+    db.run(
+      `INSERT INTO career_history (id, politicianId, week, kind, title, description, metadataJson, createdAt)
+       VALUES (?, ?, ?, 'won-election', ?, ?, ?, ?)`,
+      [
+        careerId,
+        winner.politicianId,
+        week,
+        `Won election for office`,
+        `Elected with ${(winner.voteShare * 100).toFixed(1)}% vote share`,
+        JSON.stringify({ electionId: e.id, officeId: e.officeId }),
+        Date.now(),
+      ],
+    );
+    logEvent(null, week, "election-result", `Election ${e.id} certified`, {
+      electionId: e.id,
+      winnerId: winner.politicianId,
+    });
   }
 
   // 6. Bills in committee → floor-vote after 2 weeks

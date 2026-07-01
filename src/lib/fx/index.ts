@@ -78,23 +78,28 @@ export interface TickRatesOptions {
 
 export function recordWeeklyRates(week: number, opts: TickRatesOptions = {}): number {
   const drift = opts.driftPct ?? 0.005;
-  const codes = prep<[], { code: string }>("SELECT code FROM currencies WHERE code != 'USD'").all();
-  const insert = prep<[string, number, number]>(
+  const codes = db
+    .query<{ code: string }, []>("SELECT code FROM currencies WHERE code != 'USD'")
+    .all();
+  const insert = db.prepare(
     "INSERT OR REPLACE INTO fx_rates (code, week, usdPerUnit) VALUES (?, ?, ?)"
   );
   let written = 0;
   for (const { code } of codes) {
-    const prev = prep<[string, number], { usdPerUnit: number }>(
-      "SELECT usdPerUnit FROM fx_rates WHERE code = ? AND week < ? ORDER BY week DESC LIMIT 1"
-    ).get(code, week);
+    const prev = db
+      .query<{ usdPerUnit: number }, [string, number]>(
+        "SELECT usdPerUnit FROM fx_rates WHERE code = ? AND week < ? ORDER BY week DESC LIMIT 1"
+      )
+      .get(code, week);
     if (!prev) continue;
     // Deterministic per-week jitter so replays match.
     const seed = (code.charCodeAt(0) * 31 + week * 7) % 1000;
     const delta = ((seed / 1000) - 0.5) * 2 * drift; // [-drift, +drift]
     const next = Math.max(0.0001, prev.usdPerUnit * (1 + delta));
     insert.run(code, week, next);
-    rateCache.clear(); // week advanced; invalidate
     written++;
   }
+  rateCache.clear();
+  if (written > 0) console.log(`[fx] wrote ${written} rate row(s) for week ${week}`);
   return written;
 }
