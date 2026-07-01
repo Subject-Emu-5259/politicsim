@@ -44,6 +44,7 @@ export default function App() {
             <Route path="/world" element={<World />} />
             <Route path="/markets" element={<Markets />} />
             <Route path="/wiki" element={<Wiki />} />
+            <Route path="/polls" element={<Polls />} />
             <Route path="/run" element={<RequireAuth><Run /></RequireAuth>} />
             <Route path="/profile/:id" element={<RequireAuth><Profile /></RequireAuth>} />
             <Route path="/actions/:id" element={<RequireAuth><ActionsHub /></RequireAuth>} />
