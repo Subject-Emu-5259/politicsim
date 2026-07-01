@@ -775,4 +775,35 @@ api.get("/events", (c) => {
   return c.json({ events: rows });
 });
 
+// ─────────────────────────────────────────────
+// Polls
+// ─────────────────────────────────────────────
+
+api.get("/polls", (c) => {
+  const countryId = c.req.query("country");
+  const topic = c.req.query("topic");
+  const limit = parseInt(c.req.query("limit") ?? "50", 10);
+  type PollRow = { id: string; countryId: string; week: number; topic: string; optionsJson: string; sampleSize: number; marginOfError: number };
+  const where: string[] = [];
+  const args: (string | number)[] = [];
+  if (countryId) { where.push("countryId = ?"); args.push(countryId); }
+  if (topic) { where.push("topic = ?"); args.push(topic); }
+  const sql = `SELECT id, countryId, week, topic, optionsJson, sampleSize, marginOfError
+               FROM polls
+               ${where.length ? "WHERE " + where.join(" AND ") : ""}
+               ORDER BY week DESC, countryId
+               LIMIT ?`;
+  args.push(limit);
+  const rows = (prep<typeof args, PollRow>(sql).all(...args) as PollRow[]).map((r) => ({
+    id: r.id,
+    countryId: r.countryId,
+    week: r.week,
+    topic: r.topic,
+    sampleSize: r.sampleSize,
+    marginOfError: r.marginOfError,
+    options: jsonGet<Array<{ label: string; pct: number }>>(r.optionsJson, []),
+  }));
+  return c.json({ polls: rows });
+});
+
 export default api;

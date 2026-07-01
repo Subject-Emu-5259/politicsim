@@ -22,6 +22,7 @@ import ActionsHub from "./pages/ActionsHub";
 import NotFound from "./pages/NotFound";
 import CabinetOffice from "./pages/CabinetOffice";
 import CabinetOfficeDetail from "./pages/CabinetOfficeDetail";
+import Polls from "./pages/Polls";
 
 export default function App() {
   return (

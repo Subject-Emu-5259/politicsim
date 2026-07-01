@@ -6,6 +6,7 @@ import { db, prep, jsonGet } from "../db";
 import { nanoid } from "nanoid";
 import { seedNpcPoliticians } from "../game/npc";
 import { recordWeeklyRates } from "../fx";
+import { samplePolls } from "../polls";
 import {
   REAL_MS_PER_GAME_WEEK,
   realMsToWeek,
@@ -95,6 +96,7 @@ function advanceWeek(week: number) {
   cleanupOrphanOffices(week);
 
   // 0c. NPC Autonomy: Randomly selected NPCs take actions
+  samplePolls(week);
   const npcs = prep<[], { id: string; countryId: string; partyId: string | null; statsJson: string }>(
     "SELECT id, countryId, partyId, statsJson FROM politicians WHERE ownerUserId = 'system-npc'",
   ).all();

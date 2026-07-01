@@ -126,6 +126,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <NavItem to="/world" icon={<Globe2 className="h-4 w-4" />}>World</NavItem>
             <NavItem to="/markets" icon={<TrendingUp className="h-4 w-4" />}>Markets</NavItem>
             <NavItem to="/wiki" icon={<BookOpen className="h-4 w-4" />}>Wiki</NavItem>
+            <NavItem to="/polls" icon={<BarChart3 className="h-4 w-4" />}>Polls</NavItem>
           </nav>
 
           {/* Right side: auth + profile */}
