@@ -132,8 +132,20 @@ Countries are defined as JSON in `data/countries/`. USA is shipped; UK and Japan
 - [x] Sprint 0: Scaffold, DB, types, auth, tick engine, SSE
 - [x] Sprint 1: USA config, seed, politician CRUD, actions
 - [x] Sprint 2: Full React UI (landing, dashboard, country, politician, elections, legislation)
+- [x] Sprint 2.5: Nav restructure (World / Markets / Wiki / Politicians), WIRE ticker, AHD intelligence layer
 - [ ] Sprint 3: Election voting + certification logic in tick engine
 - [ ] Sprint 4: NPC politicians + AI-driven campaigning
 - [ ] Sprint 5: UK + Japan country configs
 - [ ] Sprint 6: Coalitions (UK/JP parliamentary systems)
 - [ ] Sprint 7: Public publishing + custom domain
+- [ ] Sprint 8: **Political Doctrine Trees** (per-country, per-party; AHD-inspired)
+- [ ] Sprint 9: **Politician restructure vs. retire vs. primary challenge** (AHD-inspired)
+- [ ] Sprint 10: **Tick hardening** — currency normalization, orphan-office cleanup (AHD bug-fix-inspired)
+- [ ] Sprint 11: **Changelog & release notes** — category badges on Activity Feed (AHD UI-inspired)
+- [ ] Sprint 12: Multiplayer / real opponents
+
+See **[`ROADMAP.md`](ROADMAP.md)** for the full backlog and **[`docs/DEVLOG.md`](docs/DEVLOG.md)** for design notes and what we pulled from [A House Divided](https://www.ahousedividedgame.com/changelog).
+
+## Inspiration
+
+A House Divided ([ahousedividedgame.com](https://www.ahousedividedgame.com)) is the live reference for political-economic simulation games. We follow their changelog as a feature-velocity benchmark and selectively port their mechanics (Tech Trees → Political Doctrine Trees, corp restructuring → politician restructuring, FX bug fixes → currency normalization) where they fit PolitySim's model. See [`docs/DEVLOG.md`](docs/DEVLOG.md) for the full intake.

@@ -236,6 +236,53 @@ const MIGRATIONS: { version: number; sql: string }[] = [
       CREATE INDEX IF NOT EXISTS idx_actionlog_pol ON action_log(politicianId, createdAt);
     `,
   },
+  {
+    // Sprint 10: currency normalization + tick hardening.
+    // AHD's foreign-currency bug (changelog 2024-12-20): live FX rate was used to convert
+    // historical treasury/fundraising values, so reviewing a country's ledger in a
+    // different base currency gave different numbers than the source currency. Fix: snapshot
+    // a per-week FX rate so conversions are deterministic and historical.
+    version: 4,
+    sql: `
+      CREATE TABLE IF NOT EXISTS currencies (
+        code TEXT PRIMARY KEY,           -- ISO 4217, e.g. 'USD', 'GBP', 'JPY'
+        name TEXT NOT NULL,
+        symbol TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS country_currency (
+        countryId TEXT PRIMARY KEY,
+        code TEXT NOT NULL,
+        FOREIGN KEY (countryId) REFERENCES countries(id) ON DELETE CASCADE,
+        FOREIGN KEY (code) REFERENCES currencies(code)
+      );
+
+      -- One row per (currency, week). Used to convert any historical monetary value.
+      CREATE TABLE IF NOT EXISTS fx_rates (
+        code TEXT NOT NULL,
+        week INTEGER NOT NULL,
+        usdPerUnit REAL NOT NULL,        -- how many USD 1 unit of code was worth that week
+        PRIMARY KEY (code, week)
+      );
+      CREATE INDEX IF NOT EXISTS idx_fx_week ON fx_rates(week);
+
+      -- Seed reference currencies + a single base rate row (week 0) for each.
+      -- Tick engine will append a new row per code per week going forward.
+      INSERT OR IGNORE INTO currencies (code, name, symbol) VALUES
+        ('USD', 'United States Dollar', '$'),
+        ('GBP', 'Pound Sterling', '£'),
+        ('JPY', 'Japanese Yen', '¥');
+
+      -- Initial rate snapshot: 1 USD = 1 USD, 1 GBP = 1.27 USD, 1 JPY = 0.0067 USD
+      -- (approximate Q2 2026 levels — these update weekly via tick).
+      INSERT OR IGNORE INTO fx_rates (code, week, usdPerUnit) VALUES
+        ('USD', 0, 1.0),
+        ('GBP', 0, 1.27),
+        ('JPY', 0, 0.0067);
+
+      INSERT OR IGNORE INTO country_currency (countryId, code) VALUES ('usa', 'USD');
+    `,
+  },
 ];
 
 export function runMigrations() {

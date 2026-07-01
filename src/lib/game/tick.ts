@@ -5,6 +5,7 @@
 import { db, prep, jsonGet } from "../db";
 import { nanoid } from "nanoid";
 import { seedNpcPoliticians } from "../game/npc";
+import { recordWeeklyRates } from "../fx";
 import {
   REAL_MS_PER_GAME_WEEK,
   realMsToWeek,
@@ -268,6 +269,24 @@ function applyPolicyEffect(countryId: string, metric: string, delta: number) {
     case "approval":
       db.run("UPDATE countries SET approvalBaseline = approvalBaseline + ? WHERE id = ?", [delta * 2, countryId]);
       break;
+  }
+}
+
+function cleanupOrphanOffices(week: number) {
+  const politicians = prep<[], { id: string; officeId: string | null; status: string; countryId: string }>(
+    "SELECT id, officeId, status, countryId FROM politicians WHERE status IN ('retired', 'defeated') AND officeId IS NOT NULL",
+  ).all();
+  for (const p of politicians) {
+    if (p.officeId) {
+      db.run("UPDATE politicians SET officeId = NULL, status = 'out-of-office' WHERE id = ?", [p.id]);
+      const electionId = nanoid(12);
+      db.run(
+        `INSERT INTO elections (id, officeId, countryId, week, stage, candidatesJson, resultsJson)
+         VALUES (?, ?, ?, ?, 'scheduled', '[]', '[]')`,
+        [electionId, p.officeId, p.countryId, week],
+      );
+      logEvent(p.countryId, week, "election-scheduled", `Election for office ${p.officeId} is now scheduled.`, { electionId });
+    }
   }
 }
 
