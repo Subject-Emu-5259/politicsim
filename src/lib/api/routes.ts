@@ -806,4 +806,8 @@ api.get("/polls", (c) => {
   return c.json({ polls: rows });
 });
 
+api.get("/fx", (c) => {
+  return c.json({ ok: true });
+});
+
 export default api;

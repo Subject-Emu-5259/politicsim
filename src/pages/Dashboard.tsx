@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Users, Globe2, Activity } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { AHDPageHeader, AHDPanel, AHDTag, countryFlag } from "@/components/ahd/primitives";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useApi } from "@/hooks/useApi";
@@ -35,77 +35,86 @@ export default function Dashboard() {
 
   return (
     <AppShell>
-      <div className="flex flex-wrap items-end justify-between gap-3 pb-4">
-        <div>
-          <p className="text-sm text-muted-foreground">Signed in as <span className="font-medium text-foreground">{user.displayName}</span></p>
-          <h1 className="text-3xl font-semibold">Command Center</h1>
-        </div>
-        <Button asChild>
-          <Link to="/politicians/new"><Plus className="h-4 w-4" /> Create politician</Link>
-        </Button>
-      </div>
+      <AHDPageHeader
+        tag="🎛️ COMMAND CENTER"
+        title={user.displayName}
+        subtitle="Your politicians, countries, and live game feed"
+        right={
+          <Link to="/politicians/new" className="ahd-btn-primary inline-flex items-center gap-2">
+            <Plus className="h-4 w-4" /> CREATE POLITICIAN
+          </Link>
+        }
+      />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Users className="h-4 w-4" /> Your politicians</CardTitle>
-            <CardDescription>The people you are running or have placed in office.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
+      <div className="grid gap-3 lg:grid-cols-3">
+        <AHDPanel className="p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Users className="h-4 w-4 text-amber-500" />
+            <div className="ahd-h3">Your Politicians</div>
+            <AHDTag tone="amber">{pols?.length ?? 0}</AHDTag>
+          </div>
+          <div className="ahd-divider mb-3" />
+          <div className="space-y-1.5">
             {hydrated && (!pols || pols.length === 0) && (
-              <p className="text-sm text-muted-foreground">None yet. Create your first one.</p>
+              <p className="ahd-meta">None yet. Create your first one.</p>
             )}
             {pols?.map((p) => (
               <Link
                 key={p.id}
                 to={`/politicians/${p.id}`}
-                className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm hover:bg-accent"
+                className="ahd-row flex items-center justify-between px-2 py-1.5"
               >
                 <div>
-                  <div className="font-medium">{p.name}</div>
-                  <div className="text-xs text-muted-foreground">{p.officeId ? "In office" : p.status}</div>
+                  <div className="text-sm text-zinc-200">{p.name}</div>
+                  <div className="text-[10px] text-amber-600/70 uppercase tracking-wider">{p.officeId ? "In Office" : p.status}</div>
                 </div>
-                <Badge variant={(p.stats?.approval ?? 0) >= 50 ? "default" : "secondary"}>
+                <AHDTag tone={(p.stats?.approval ?? 0) >= 50 ? "positive" : "negative"}>
                   {Math.round(p.stats?.approval ?? 0)}%
-                </Badge>
+                </AHDTag>
               </Link>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </AHDPanel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Globe2 className="h-4 w-4" /> Countries</CardTitle>
-            <CardDescription>Pick a country to watch its politics.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-2">
+        <AHDPanel className="p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Globe2 className="h-4 w-4 text-amber-500" />
+            <div className="ahd-h3">Countries</div>
+            <AHDTag tone="amber">{countries?.length ?? 0}</AHDTag>
+          </div>
+          <div className="ahd-divider mb-3" />
+          <div className="grid grid-cols-2 gap-1.5">
             {countries?.map((c) => (
-              <Link key={c.id} to={`/countries/${c.id}`} className="rounded-md border border-border px-3 py-2 text-sm hover:bg-accent">
-                <div className="font-medium">{c.name}</div>
-                <div className="text-xs text-muted-foreground">{c.code}</div>
+              <Link key={c.id} to={`/countries/${c.id}`} className="ahd-row px-2 py-1.5">
+                <div className="text-sm text-zinc-200 flex items-center gap-1.5">
+                  <span>{countryFlag(c.id)}</span>{c.name}
+                </div>
+                <div className="text-[10px] text-amber-600/70">{c.code}</div>
               </Link>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </AHDPanel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Activity className="h-4 w-4" /> Live ticker</CardTitle>
-            <CardDescription>Game-wide events as they happen.</CardDescription>
-          </CardHeader>
-          <CardContent className="max-h-72 space-y-1 overflow-auto pr-2">
-            {events.length === 0 && <p className="text-sm text-muted-foreground">Waiting for the first tick…</p>}
+        <AHDPanel className="p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="h-4 w-4 text-amber-500" />
+            <div className="ahd-h3">Live Ticker</div>
+            <AHDTag tone="amber">{events.length}</AHDTag>
+          </div>
+          <div className="ahd-divider mb-3" />
+          <div className="max-h-72 space-y-1 overflow-auto pr-1">
+            {events.length === 0 && <p className="ahd-meta">Waiting for the first tick…</p>}
             {events.map((e) => (
-              <div key={e.id} className="rounded-md border border-border px-2 py-1.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline" className="text-[10px]">{e.kind}</Badge>
-                  <span className="text-muted-foreground">w{Math.round(e.week)}</span>
+              <div key={e.id} className="ahd-row px-2 py-1.5">
+                <div className="flex items-center justify-between mb-0.5">
+                  <AHDTag tone="stage">{e.kind}</AHDTag>
+                  <span className="text-[10px] text-amber-600/70">w{Math.round(e.week)}</span>
                 </div>
-                <div className="mt-1">{e.message}</div>
+                <div className="text-xs text-zinc-300">{e.message}</div>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </AHDPanel>
       </div>
     </AppShell>
   );

@@ -1,7 +1,6 @@
 import { FileText, CheckCircle2, XCircle, Clock } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { AHDPageHeader, AHDPanel, AHDTag } from "@/components/ahd/primitives";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/useApi";
 
@@ -28,8 +27,7 @@ export default function LegislationPage() {
 
   return (
     <AppShell>
-      <h1 className="text-3xl font-semibold">Legislation</h1>
-      <p className="text-sm text-muted-foreground">Bills moving through chambers.</p>
+      <AHDPageHeader tag="🏛️ CONGRESS" title="Legislation" subtitle={`${bills.length} bills in pipeline`} />
 
       <Tabs defaultValue="introduced" className="mt-6">
         <TabsList>
@@ -43,21 +41,20 @@ export default function LegislationPage() {
         {([["introduced", introduced], ["committee", inCommittee], ["floor", onFloor], ["passed", passed], ["failed", failed]] as const).map(([key, list]) => (
           <TabsContent key={key} value={key} className="grid gap-3 md:grid-cols-2">
             {list.map((b) => (
-              <Card key={b.id}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{b.title}</CardTitle>
-                  <CardDescription>{b.summary}</CardDescription>
-                </CardHeader>
-                <CardContent className="text-sm space-y-1">
-                  <p className="text-xs text-muted-foreground">Sponsored by {b.sponsorName ?? "—"} • w{b.proposedWeek}</p>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{b.topic}</Badge>
-                    <Badge variant="secondary">{b.stage}</Badge>
-                  </div>
-                </CardContent>
-              </Card>
+              <AHDPanel key={b.id} className="p-3">
+                <div className="flex items-center justify-between">
+                  <div className="ahd-h3">{b.title}</div>
+                  <AHDTag tone="stage">{b.stage}</AHDTag>
+                </div>
+                <div className="ahd-meta mt-1.5">{b.summary}</div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <AHDTag tone="default">{b.topic}</AHDTag>
+                  <AHDTag tone="country">🌍 {b.countryId.toUpperCase()}</AHDTag>
+                </div>
+                <div className="ahd-meta mt-2">Sponsored by {b.sponsorName ?? "—"} • w{b.proposedWeek}</div>
+              </AHDPanel>
             ))}
-            {list.length === 0 && <p className="text-sm text-muted-foreground">No bills in this stage.</p>}
+            {list.length === 0 && <p className="ahd-meta">No bills in this stage.</p>}
           </TabsContent>
         ))}
       </Tabs>

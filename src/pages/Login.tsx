@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
+import { AHDPanel, AHDTag, countryFlag } from "@/components/ahd/primitives";
+import { LogIn, Mail, Lock } from "lucide-react";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -34,31 +35,40 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl">Sign in</CardTitle>
-          <CardDescription>Welcome back to PolitySim.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+    <div className="ahd-page-login flex items-center justify-center px-4 py-12">
+      <AHDPanel className="w-full max-w-md p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <AHDTag tone="amber">🔐 LOGIN</AHDTag>
+          <AHDTag tone="country">{countryFlag("usa")} USA</AHDTag>
+        </div>
+        <h1 className="ahd-h1 mt-1">Sign in</h1>
+        <p className="ahd-meta mt-1">Welcome back to PolitySim.</p>
+
+        <form onSubmit={onSubmit} className="mt-6 space-y-4">
+          <div>
+            <Label htmlFor="email" className="ahd-meta uppercase tracking-wider text-[10px]">Email</Label>
+            <div className="relative mt-1.5">
+              <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-500/60" />
+              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="ahd-input pl-8" />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="password" className="ahd-meta uppercase tracking-wider text-[10px]">Password</Label>
+            <div className="relative mt-1.5">
+              <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-500/60" />
+              <Input id="password" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className="ahd-input pl-8" />
             </div>
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Signing in…" : "Sign in"}
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            New here? <Link to="/register" className="text-primary font-medium hover:underline">Create an account</Link>
-          </p>
-        </CardContent>
-      </Card>
+          </div>
+          <Button type="submit" className="w-full ahd-cta" disabled={submitting}>
+            <LogIn className="h-4 w-4" />
+            {submitting ? "Signing in…" : "Sign in"}
+          </Button>
+        </form>
+
+        <p className="ahd-meta mt-6 text-center">
+          New here? <Link to="/register" className="text-amber-400 hover:underline font-medium">Create an account</Link>
+        </p>
+      </AHDPanel>
     </div>
   );
 }

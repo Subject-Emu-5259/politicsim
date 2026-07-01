@@ -1,12 +1,10 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, TrendingUp, TrendingDown, Users, Building2, Vote } from "lucide-react";
+import { ArrowLeft, Users, Building2, Vote, Activity } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useApi } from "@/hooks/useApi";
 import { useLiveEvents } from "@/hooks/useLiveEvents";
+import { AHDPageHeader, AHDPanel, AHDStatStrip, AHDTag, countryFlag, formatUSD, formatPct } from "@/components/ahd/primitives";
 
 interface CountryDetail {
   country: { id: string; name: string; code: string; gdp: number; population: number; unemploymentPct: number; inflationPct: number; approvalBaseline: number };
@@ -28,20 +26,21 @@ export default function CountryView() {
 
   return (
     <AppShell>
-      <div className="flex items-center gap-3 pb-4">
-        <Button variant="ghost" size="sm" asChild><Link to="/dashboard"><ArrowLeft className="h-4 w-4" /> Back</Link></Button>
-        <div>
-          <h1 className="text-3xl font-semibold">{country.name}</h1>
-          <p className="text-sm text-muted-foreground">{country.code} • {(country.population / 1_000_000).toFixed(0)}M residents</p>
-        </div>
-      </div>
+      <AHDPageHeader
+        tag={`${countryFlag(country.id)} ${country.id.toUpperCase()}`}
+        title={country.name}
+        subtitle={`${country.code} • ${(country.population / 1_000_000).toFixed(0)}M residents`}
+        right={<AHDTag tone="amber">APPROVAL {formatPct(country.approvalBaseline, 0)}</AHDTag>}
+      />
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">GDP</p><p className="text-2xl font-semibold">${(country.gdp / 1000).toFixed(2)}T</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Unemployment</p><p className="text-2xl font-semibold">{country.unemploymentPct.toFixed(1)}%</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Inflation</p><p className="text-2xl font-semibold">{country.inflationPct.toFixed(1)}%</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Baseline approval</p><p className="text-2xl font-semibold">{country.approvalBaseline.toFixed(0)}%</p></CardContent></Card>
-      </div>
+      <AHDPanel className="p-4 mb-4">
+        <AHDStatStrip stats={[
+          { label: "GDP", value: formatUSD(country.gdp) },
+          { label: "UNEMP", value: formatPct(country.unemploymentPct) },
+          { label: "INFLATION", value: formatPct(country.inflationPct) },
+          { label: "APPROVAL", value: formatPct(country.approvalBaseline, 0), tone: country.approvalBaseline >= 50 ? "positive" : "negative" },
+        ]} />
+      </AHDPanel>
 
       <Tabs defaultValue="parties" className="mt-6">
         <TabsList>
@@ -53,68 +52,62 @@ export default function CountryView() {
 
         <TabsContent value="parties" className="grid gap-3 md:grid-cols-2">
           {parties.map((p) => (
-            <Card key={p.id}>
-              <CardContent className="flex items-center justify-between pt-6">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: p.color }} />
-                    <p className="font-semibold">{p.name}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{p.ideology} • {p.memberCount} members</p>
+            <AHDPanel key={p.id} className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block h-3 w-3" style={{ backgroundColor: p.color }} />
+                  <span className="ahd-h3">{p.name}</span>
                 </div>
-                <div className="text-right text-sm">
-                  <p className="font-medium">${(p.treasuryUSD / 1_000_000).toFixed(1)}M</p>
-                  <p className="text-xs text-muted-foreground">treasury</p>
-                </div>
-              </CardContent>
-            </Card>
+                <AHDTag tone="amber">{p.ideology}</AHDTag>
+              </div>
+              <div className="ahd-meta mt-1">{p.shortName} • {p.memberCount} members</div>
+              <AHDStatStrip stats={[
+                { label: "TREASURY", value: formatUSD(p.treasuryUSD) },
+                { label: "ID", value: p.id },
+              ]} />
+            </AHDPanel>
           ))}
         </TabsContent>
 
         <TabsContent value="demographics" className="grid gap-3 md:grid-cols-3">
           {demographics.map((d) => (
-            <Card key={d.id}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{d.name}</CardTitle>
-                <CardDescription>{(d.populationShare * 100).toFixed(0)}% of population</CardDescription>
-              </CardHeader>
-              <CardContent className="text-sm">
-                <p>Baseline approval: <span className="font-medium">{d.approvalBaseline.toFixed(0)}%</span></p>
-              </CardContent>
-            </Card>
+            <AHDPanel key={d.id} className="p-4">
+              <AHDPageHeader tag="👥 DEMO" title={d.name} subtitle={`${(d.populationShare * 100).toFixed(0)}% of population`} />
+              <AHDStatStrip stats={[
+                { label: "APPROVAL", value: formatPct(d.approvalBaseline, 0), tone: d.approvalBaseline >= 50 ? "positive" : "negative" },
+              ]} />
+            </AHDPanel>
           ))}
         </TabsContent>
 
         <TabsContent value="offices" className="space-y-2">
           {offices.slice(0, 50).map((o) => (
-            <Card key={o.id}>
-              <CardContent className="flex items-center justify-between pt-6 text-sm">
+            <AHDPanel key={o.id} className="p-3">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">{o.name}</p>
-                  <p className="text-xs text-muted-foreground">{o.chamber ?? "—"} • {o.region}</p>
+                  <div className="ahd-h3">{o.name}</div>
+                  <div className="ahd-meta">{o.chamber ?? "—"} • {o.region} • {o.type}</div>
                 </div>
-                <Badge variant="outline">Next election w{o.nextElectionWeek}</Badge>
-              </CardContent>
-            </Card>
+                <AHDTag tone="amber">NEXT ELECTION w{o.nextElectionWeek}</AHDTag>
+              </div>
+            </AHDPanel>
           ))}
-          {offices.length > 50 && <p className="text-xs text-muted-foreground">Showing 50 of {offices.length} offices.</p>}
+          {offices.length > 50 && <p className="ahd-meta">Showing 50 of {offices.length} offices.</p>}
         </TabsContent>
 
         <TabsContent value="activity">
-          <Card>
-            <CardContent className="max-h-[28rem] space-y-2 overflow-auto pt-6">
-              {countryEvents.length === 0 && <p className="text-sm text-muted-foreground">No recent activity.</p>}
-              {countryEvents.map((e) => (
-                <div key={e.id} className="rounded-md border border-border p-2 text-sm">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <Badge variant="outline" className="text-[10px]">{e.kind}</Badge>
-                    <span>w{Math.round(e.week)}</span>
-                  </div>
-                  <div className="mt-1">{e.message}</div>
+          <AHDPanel className="p-3 max-h-[28rem] overflow-auto">
+            {countryEvents.length === 0 && <p className="ahd-meta">No recent activity.</p>}
+            {countryEvents.map((e) => (
+              <div key={e.id} className="border-b border-zinc-800/50 py-2 last:border-0">
+                <div className="flex items-center justify-between">
+                  <AHDTag tone="stage">{e.kind}</AHDTag>
+                  <span className="ahd-meta">w{Math.round(e.week)}</span>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
+                <div className="mt-1 text-sm">{e.message}</div>
+              </div>
+            ))}
+          </AHDPanel>
         </TabsContent>
       </Tabs>
     </AppShell>

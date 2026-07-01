@@ -4,9 +4,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* WIRE ticker animation — scrolling event feed */
+/* ─────────────────────────────────────────────
+   A House Divided — terminal visual language
+   Dark CRT background, amber/bronze accents,
+   monospace numerics, scanlines, grid texture.
+   Mirrors the look of ahousedividedgame.com.
+   ───────────────────────────────────────────── */
+
 @keyframes wire-scroll {
-  0% { transform: translateX(100%); }
+  0%   { transform: translateX(100%); }
   100% { transform: translateX(-100%); }
 }
 .wire-track {
@@ -14,100 +20,123 @@
   white-space: nowrap;
   animation: wire-scroll 60s linear infinite;
 }
-.wire-track:hover {
-  animation-play-state: paused;
+.wire-track:hover { animation-play-state: paused; }
+
+@keyframes ahd-flicker {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.94; }
+}
+@keyframes ahd-cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.ahd-cursor::after {
+  content: "▌";
+  margin-left: 0.15em;
+  color: #d8a657;
+  animation: ahd-cursor-blink 1s steps(2) infinite;
 }
 
-/* Footer game-state bar */
-.game-footer-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 40;
+@keyframes ahd-scan {
+  0%   { background-position: 0 0; }
+  100% { background-position: 0 4px; }
 }
 
+.game-footer-bar { position: sticky; bottom: 0; z-index: 40; }
+
+/* ─────────  AHD color tokens  ─────────
+   Background: near-black with warm tint (CRT phosphor)
+   Foreground: warm bone/parchment
+   Accent: amber/bronze
+   Edge: oxidized brass
+*/
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.147 0.004 49.25);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.147 0.004 49.25);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.147 0.004 49.25);
-  --primary: oklch(0.216 0.006 56.043);
-  --primary-foreground: oklch(0.985 0.001 106.423);
-  --secondary: oklch(0.97 0.001 106.424);
-  --secondary-foreground: oklch(0.216 0.006 56.043);
-  --muted: oklch(0.97 0.001 106.424);
-  --muted-foreground: oklch(0.553 0.013 58.071);
-  --accent: oklch(0.97 0.001 106.424);
-  --accent-foreground: oklch(0.216 0.006 56.043);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.923 0.003 48.717);
-  --input: oklch(0.923 0.003 48.717);
-  --ring: oklch(0.709 0.01 56.259);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0.001 106.423);
-  --sidebar-foreground: oklch(0.147 0.004 49.25);
-  --sidebar-primary: oklch(0.216 0.006 56.043);
-  --sidebar-primary-foreground: oklch(0.985 0.001 106.423);
-  --sidebar-accent: oklch(0.97 0.001 106.424);
-  --sidebar-accent-foreground: oklch(0.216 0.006 56.043);
-  --sidebar-border: oklch(0.923 0.003 48.717);
-  --sidebar-ring: oklch(0.709 0.01 56.259);
+  --radius: 0.125rem; /* sharper corners — terminal feel */
+
+  /* CRT bg gradient + warm text */
+  --background: #0c0a08;
+  --foreground: #d8cdb8;
+  --card: #15110d;
+  --card-foreground: #d8cdb8;
+  --popover: #15110d;
+  --popover-foreground: #d8cdb8;
+
+  /* Amber primary (the AHD gold) */
+  --primary: #d8a657;
+  --primary-foreground: #0c0a08;
+
+  /* Recessed surface */
+  --secondary: #1c1812;
+  --secondary-foreground: #d8cdb8;
+  --muted: #1c1812;
+  --muted-foreground: #8a7f6c;
+  --accent: #251e15;
+  --accent-foreground: #d8a657;
+
+  --destructive: #c1453a;
+
+  /* Brass borders */
+  --border: #3a2f1f;
+  --input: #1c1812;
+  --ring: #d8a657;
+
+  --chart-1: #d8a657;
+  --chart-2: #6f9c7a;
+  --chart-3: #b85a4a;
+  --chart-4: #5e8aa8;
+  --chart-5: #8a7f6c;
+
+  --sidebar: #0c0a08;
+  --sidebar-foreground: #d8cdb8;
+  --sidebar-primary: #d8a657;
+  --sidebar-primary-foreground: #0c0a08;
+  --sidebar-accent: #1c1812;
+  --sidebar-accent-foreground: #d8a657;
+  --sidebar-border: #3a2f1f;
+  --sidebar-ring: #d8a657;
 }
 
-.dark {
-  --background: oklch(0.147 0.004 49.25);
-  --foreground: oklch(0.985 0.001 106.423);
-  --card: oklch(0.216 0.006 56.043);
-  --card-foreground: oklch(0.985 0.001 106.423);
-  --popover: oklch(0.216 0.006 56.043);
-  --popover-foreground: oklch(0.985 0.001 106.423);
-  --primary: oklch(0.923 0.003 48.717);
-  --primary-foreground: oklch(0.216 0.006 56.043);
-  --secondary: oklch(0.268 0.007 34.298);
-  --secondary-foreground: oklch(0.985 0.001 106.423);
-  --muted: oklch(0.268 0.007 34.298);
-  --muted-foreground: oklch(0.709 0.01 56.259);
-  --accent: oklch(0.268 0.007 34.298);
-  --accent-foreground: oklch(0.985 0.001 106.423);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.553 0.013 58.071);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.216 0.006 56.043);
-  --sidebar-foreground: oklch(0.985 0.001 106.423);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0.001 106.423);
-  --sidebar-accent: oklch(0.268 0.007 34.298);
-  --sidebar-accent-foreground: oklch(0.985 0.001 106.423);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.553 0.013 58.071);
-}
+/* AHD is always dark — no light variant. */
 
 body {
   margin: 0;
+  background:
+    radial-gradient(ellipse at top, rgba(216, 166, 87, 0.04), transparent 60%),
+    radial-gradient(ellipse at bottom, rgba(184, 90, 74, 0.03), transparent 60%),
+    var(--background);
+  color: var(--foreground);
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+/* CRT scanline overlay (subtle, fixed) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 2px,
+      rgba(0, 0, 0, 0.18) 2px,
+      rgba(0, 0, 0, 0.18) 3px
+    );
+  mix-blend-mode: multiply;
+  opacity: 0.6;
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
   --radius-xl: calc(var(--radius) + 4px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -149,4 +178,177 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    letter-spacing: 0.01em;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   AHD-style utility classes (used by every page)
+   ───────────────────────────────────────────── */
+
+/* Brushed-bronze panel: dark base + subtle inner gradient + brass border */
+.ahd-panel {
+  background: linear-gradient(180deg, rgba(216, 166, 87, 0.02), transparent 30%), var(--card);
+  border: 1px solid var(--border);
+  position: relative;
+}
+.ahd-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(216, 166, 87, 0.08), transparent 1px, transparent calc(100% - 1px), rgba(216, 166, 87, 0.08));
+}
+.ahd-panel-header {
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(216, 166, 87, 0.06), transparent);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+/* Monospace numerics */
+.ahd-mono { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
+.ahd-num  { font-variant-numeric: tabular-nums; font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
+
+/* Section header with terminal corner brackets */
+.ahd-section {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+.ahd-section::before {
+  content: "▌";
+  color: var(--primary);
+  font-size: 0.85em;
+  line-height: 1;
+}
+
+/* Tag chip — AHD category-badge style */
+.ahd-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+  background: rgba(216, 166, 87, 0.04);
+  border-radius: 0.125rem;
+}
+.ahd-tag-amber {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: rgba(216, 166, 87, 0.08);
+}
+.ahd-tag-emerald {
+  color: #6f9c7a;
+  border-color: #6f9c7a;
+  background: rgba(111, 156, 122, 0.06);
+}
+.ahd-tag-rose {
+  color: #c1453a;
+  border-color: #c1453a;
+  background: rgba(193, 69, 58, 0.06);
+}
+.ahd-tag-cyan {
+  color: #5e8aa8;
+  border-color: #5e8aa8;
+  background: rgba(94, 138, 168, 0.06);
+}
+
+/* Stat block */
+.ahd-stat {
+  border: 1px solid var(--border);
+  background: var(--secondary);
+  padding: 0.5rem 0.75rem;
+  position: relative;
+}
+.ahd-stat-label {
+  font-size: 0.625rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.ahd-stat-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin-top: 0.15rem;
+}
+
+/* Tabs — AHD style: pill-row, active = amber underline + amber text */
+.ahd-tabs-list {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  background: var(--secondary);
+}
+.ahd-tab {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  background: transparent;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.ahd-tab:last-child { border-right: none; }
+.ahd-tab:hover { color: var(--foreground); background: rgba(216, 166, 87, 0.06); }
+.ahd-tab[data-active="true"] {
+  color: var(--primary);
+  background: rgba(216, 166, 87, 0.12);
+  box-shadow: inset 0 -2px 0 0 var(--primary);
+}
+
+/* Terminal frame chrome */
+.ahd-frame {
+  border: 1px solid var(--border);
+  background: var(--card);
+  position: relative;
+}
+.ahd-frame::before {
+  content: "";
+  position: absolute;
+  top: -1px; left: 8px; right: 8px; height: 1px;
+  background: var(--primary);
+  opacity: 0.5;
+}
+.ahd-frame::after {
+  content: "";
+  position: absolute;
+  bottom: -1px; left: 8px; right: 8px; height: 1px;
+  background: var(--primary);
+  opacity: 0.5;
+}
+
+/* Backplate (institutional matte) */
+.ahd-backplate {
+  background: var(--background);
+  background-image:
+    linear-gradient(rgba(216, 166, 87, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(216, 166, 87, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
 }
